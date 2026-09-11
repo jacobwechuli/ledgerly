@@ -11,15 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// MockStore for testing without a real database
-type MockStore struct {
-	transactions             []models.Transaction
-	mobileMoneyTransactions  []models.MobileMoneyTransaction
-	budgetGoals              []models.BudgetGoal
-	bills                    []models.Bill
-	budgetTemplates          []models.BudgetTemplate
-}
-
 func TestPaginate(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -43,70 +34,64 @@ func TestPaginate(t *testing.T) {
 	}
 }
 
-func TestCreateTransactionRequest_Validation(t *testing.T) {
+func TestCreateAccountRequest_Validation(t *testing.T) {
 	tests := []struct {
 		name    string
-		req     models.CreateTransactionRequest
+		req     models.CreateAccountRequest
 		isValid bool
 	}{
 		{
-			name: "valid income",
-			req: models.CreateTransactionRequest{
-				Amount:   100.50,
-				Type:     "income",
-				Category: "salary",
-				Source:   "bank",
-				Date:     time.Now(),
+			name: "valid bank account",
+			req: models.CreateAccountRequest{
+				Name:        "Chase Checking",
+				Type:        "bank",
+				SubType:     "checking",
+				Currency:    "USD",
+				Balance:     50000.00,
+				Institution: "Chase Bank",
 			},
 			isValid: true,
 		},
 		{
-			name: "valid expense",
-			req: models.CreateTransactionRequest{
-				Amount:   50.00,
-				Type:     "expense",
-				Category: "food",
-				Source:   "cash",
-				Date:     time.Now(),
+			name: "valid mobile money account",
+			req: models.CreateAccountRequest{
+				Name:     "M-Pesa",
+				Type:     "mobile_money",
+				SubType:  "mpesa",
+				Currency: "KES",
+				Balance:  250000.00,
+			},
+			isValid: true,
+		},
+		{
+			name: "valid investment account",
+			req: models.CreateAccountRequest{
+				Name:        "Interactive Brokers",
+				Type:        "investment",
+				SubType:     "stock_portfolio",
+				Currency:    "USD",
+				Balance:     500000.00,
+				Institution: "Interactive Brokers",
 			},
 			isValid: true,
 		},
 		{
 			name: "invalid type",
-			req: models.CreateTransactionRequest{
-				Amount:   100.00,
+			req: models.CreateAccountRequest{
+				Name:     "Test",
 				Type:     "invalid",
-				Category: "food",
-				Source:   "bank",
+				SubType:  "checking",
+				Currency: "USD",
 			},
 			isValid: false,
 		},
 		{
-			name: "zero amount",
-			req: models.CreateTransactionRequest{
-				Amount:   0,
-				Type:     "income",
-				Category: "salary",
-				Source:   "bank",
-			},
-			isValid: false,
-		},
-		{
-			name: "negative amount",
-			req: models.CreateTransactionRequest{
-				Amount:   -50.00,
-				Type:     "expense",
-				Category: "food",
-				Source:   "cash",
-			},
-			isValid: false,
-		},
-		{
-			name: "missing source",
-			req: models.CreateTransactionRequest{
-				Amount:   100.00,
-				Type:     "income",
-				Category: "salary",
+			name: "invalid currency length",
+			req: models.CreateAccountRequest{
+				Name:     "Test",
+				Type:     "bank",
+				SubType:  "checking",
+				Currency: "USDT",
 			},
 			isValid: false,
 		},
@@ -114,53 +99,61 @@ func TestCreateTransactionRequest_Validation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Basic validation checks
 			if tt.isValid {
-				assert.Greater(t, tt.req.Amount, 0.0)
-				assert.Contains(t, []string{"income", "expense"}, tt.req.Type)
-				assert.NotEmpty(t, tt.req.Category)
-				assert.Contains(t, []string{"bank", "cash", "mobile_money", "card"}, tt.req.Source)
+				assert.NotEmpty(t, tt.req.Name)
+				assert.Contains(t, []string{"bank", "mobile_money", "investment", "property"}, tt.req.Type)
+				assert.Len(t, tt.req.Currency, 3)
+				assert.GreaterOrEqual(t, tt.req.Balance, 0.0)
 			}
 		})
 	}
 }
 
-func TestCreateMobileMoneyRequest_Validation(t *testing.T) {
+func TestCreateInvestmentRequest_Validation(t *testing.T) {
 	tests := []struct {
 		name    string
-		req     models.CreateMobileMoneyRequest
+		req     models.CreateInvestmentRequest
 		isValid bool
 	}{
 		{
-			name: "valid send",
-			req: models.CreateMobileMoneyRequest{
-				TransactionID: "TX123",
-				Amount:        500.00,
-				Type:          "send",
-				PhoneNumber:   "+254712345678",
-				Provider:      "mpesa",
+			name: "valid stock",
+			req: models.CreateInvestmentRequest{
+				AccountID:    uuid.New(),
+				Symbol:       "AAPL",
+				Name:         "Apple Inc.",
+				Type:         "stock",
+				Quantity:     100,
+				AvgCostBasis: 150.00,
+				CurrentPrice: 175.00,
+				Currency:     "USD",
 			},
 			isValid: true,
 		},
 		{
-			name: "valid receive",
-			req: models.CreateMobileMoneyRequest{
-				TransactionID: "TX456",
-				Amount:        1000.00,
-				Type:          "receive",
-				PhoneNumber:   "+254712345678",
-				Provider:      "airtel_money",
+			name: "valid crypto",
+			req: models.CreateInvestmentRequest{
+				AccountID:    uuid.New(),
+				Symbol:       "BTC",
+				Name:         "Bitcoin",
+				Type:         "crypto",
+				Quantity:     0.5,
+				AvgCostBasis: 30000.00,
+				CurrentPrice: 45000.00,
+				Currency:     "USD",
 			},
 			isValid: true,
 		},
 		{
-			name: "invalid provider",
-			req: models.CreateMobileMoneyRequest{
-				TransactionID: "TX789",
-				Amount:        200.00,
-				Type:          "send",
-				PhoneNumber:   "+254712345678",
-				Provider:      "invalid_provider",
+			name: "invalid type",
+			req: models.CreateInvestmentRequest{
+				AccountID:    uuid.New(),
+				Symbol:       "TEST",
+				Name:         "Test",
+				Type:         "invalid",
+				Quantity:     10,
+				AvgCostBasis: 100.00,
+				CurrentPrice: 120.00,
+				Currency:     "USD",
 			},
 			isValid: false,
 		},
@@ -168,112 +161,214 @@ func TestCreateMobileMoneyRequest_Validation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			validProviders := []string{"mpesa", "airtel_money", "tigo_pesa"}
-			validTypes := []string{"send", "receive", "paybill", "buygoods"}
-
 			if tt.isValid {
-				assert.Greater(t, tt.req.Amount, 0.0)
-				assert.Contains(t, validTypes, tt.req.Type)
-				assert.Contains(t, validProviders, tt.req.Provider)
-				assert.NotEmpty(t, tt.req.PhoneNumber)
-				assert.NotEmpty(t, tt.req.TransactionID)
+				assert.NotEmpty(t, tt.req.Symbol)
+				assert.Contains(t, []string{"stock", "etf", "mutual_fund", "crypto", "bond"}, tt.req.Type)
+				assert.Greater(t, tt.req.Quantity, 0.0)
+				assert.Len(t, tt.req.Currency, 3)
 			}
 		})
 	}
 }
 
-func TestBudgetGoal_Progress(t *testing.T) {
+func TestCreatePropertyRequest_Validation(t *testing.T) {
+	tests := []struct {
+		name    string
+		req     models.CreatePropertyRequest
+		isValid bool
+	}{
+		{
+			name: "valid real estate",
+			req: models.CreatePropertyRequest{
+				AccountID:     uuid.New(),
+				Name:          "Nairobi Apartment",
+				Type:          "real_estate",
+				Description:   "3-bedroom apartment in Westlands",
+				CurrentValue:  25000000.00,
+				PurchasePrice: 20000000.00,
+				Currency:      "KES",
+				Location:      "Westlands, Nairobi",
+			},
+			isValid: true,
+		},
+		{
+			name: "valid vehicle",
+			req: models.CreatePropertyRequest{
+				AccountID:     uuid.New(),
+				Name:          "Range Rover Sport",
+				Type:          "vehicle",
+				CurrentValue:  85000.00,
+				PurchasePrice: 95000.00,
+				Currency:      "USD",
+			},
+			isValid: true,
+		},
+		{
+			name: "invalid type",
+			req: models.CreatePropertyRequest{
+				AccountID:     uuid.New(),
+				Name:          "Test",
+				Type:          "invalid",
+				CurrentValue:  100000.00,
+				PurchasePrice: 100000.00,
+				Currency:      "USD",
+			},
+			isValid: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.isValid {
+				assert.NotEmpty(t, tt.req.Name)
+				assert.Contains(t, []string{"real_estate", "vehicle", "art", "jewelry", "other"}, tt.req.Type)
+				assert.GreaterOrEqual(t, tt.req.CurrentValue, 0.0)
+				assert.Len(t, tt.req.Currency, 3)
+			}
+		})
+	}
+}
+
+func TestBudgetGoal_HNWCategories(t *testing.T) {
 	goal := models.BudgetGoal{
 		ID:            uuid.New(),
 		UserID:        "user_123",
-		Name:          "Emergency Fund",
-		TargetAmount:  10000.00,
-		CurrentAmount: 0,
-		Category:      "savings",
+		Name:          "Beach House in Diani",
+		TargetAmount:  50000000.00,
+		CurrentAmount: 15000000.00,
+		Currency:      "KES",
+		Category:      "property",
+		Priority:      "high",
 		Status:        "active",
 	}
 
 	// Test progress calculation
 	progress := (goal.CurrentAmount / goal.TargetAmount) * 100
-	assert.Equal(t, 0.0, progress)
+	assert.Equal(t, 30.0, progress)
 
-	// Simulate contribution
-	goal.CurrentAmount += 2500.00
-	progress = (goal.CurrentAmount / goal.TargetAmount) * 100
-	assert.Equal(t, 25.0, progress)
+	// Verify HNW-specific categories
+	validCategories := []string{"property", "education", "retirement", "travel", "business"}
+	assert.Contains(t, validCategories, goal.Category)
 
-	// Complete the goal
-	goal.CurrentAmount = goal.TargetAmount
-	progress = (goal.CurrentAmount / goal.TargetAmount) * 100
-	assert.Equal(t, 100.0, progress)
+	// Verify priority levels
+	validPriorities := []string{"high", "medium", "low"}
+	assert.Contains(t, validPriorities, goal.Priority)
 }
 
-func TestBill_PaidStatus(t *testing.T) {
-	bill := models.Bill{
-		ID:         uuid.New(),
-		UserID:     "user_123",
-		Name:       "Electricity",
-		Amount:     150.00,
-		Category:   "utilities",
-		DueDate:    time.Now().Add(7 * 24 * time.Hour),
-		Recurrence: "monthly",
-		IsPaid:     false,
+func TestNetWorthSummary(t *testing.T) {
+	summary := models.NetWorthSummary{
+		TotalUSD:       2500000.00,
+		CashUSD:        500000.00,
+		InvestmentsUSD: 1500000.00,
+		PropertyUSD:    500000.00,
+		Change30d:      50000.00,
+		ChangePct30d:   2.04,
 	}
 
-	assert.False(t, bill.IsPaid)
-	assert.Nil(t, bill.PaidDate)
-
-	// Mark as paid
-	now := time.Now()
-	bill.IsPaid = true
-	bill.PaidDate = &now
-
-	assert.True(t, bill.IsPaid)
-	assert.NotNil(t, bill.PaidDate)
+	assert.Equal(t, summary.TotalUSD, summary.CashUSD+summary.InvestmentsUSD+summary.PropertyUSD)
+	assert.Greater(t, summary.ChangePct30d, 0.0)
 }
 
-// Integration-style test that verifies the store interface
+func TestUserSettings_PrivacyMode(t *testing.T) {
+	settings := models.UserSettings{
+		UserID:          "user_123",
+		PrivacyMode:     true,
+		DefaultCurrency: "USD",
+		Theme:           "dark",
+		UpdatedAt:       time.Now(),
+	}
+
+	assert.True(t, settings.PrivacyMode)
+	assert.Equal(t, "USD", settings.DefaultCurrency)
+	assert.Equal(t, "dark", settings.Theme)
+}
+
+func TestCurrencyConversion(t *testing.T) {
+	conversion := models.CurrencyConversion{
+		FromCurrency: "KES",
+		ToCurrency:   "USD",
+		Amount:       100000.00,
+		Result:       770.00, // 100000 KES * 0.0077 = 770 USD
+		Rate:         0.0077,
+	}
+
+	assert.Equal(t, "KES", conversion.FromCurrency)
+	assert.Equal(t, "USD", conversion.ToCurrency)
+	assert.Equal(t, 100000.00, conversion.Amount)
+	assert.Greater(t, conversion.Result, 0.0)
+}
+
+func TestAIInsight(t *testing.T) {
+	insight := models.AIInsight{
+		ID:          "insight_1",
+		Category:    "currency",
+		Title:       "USD Exposure Declined",
+		Description: "Your USD-denominated assets decreased by 8% this month due to KES strengthening against the dollar.",
+		Impact:      "negative",
+		Priority:    "high",
+		GeneratedAt: time.Now(),
+	}
+
+	assert.Equal(t, "currency", insight.Category)
+	assert.Contains(t, []string{"portfolio", "cash_flow", "currency", "tax", "goals"}, insight.Category)
+	assert.Contains(t, []string{"positive", "negative", "neutral"}, insight.Impact)
+	assert.Contains(t, []string{"high", "medium", "low"}, insight.Priority)
+}
+
 func TestStoreInterface(t *testing.T) {
-	// This test verifies the store can be created with valid config
-	// Actual DB tests would need a test database
 	t.Run("store requires database URL", func(t *testing.T) {
 		_, err := New("")
 		require.Error(t, err)
 	})
 }
 
-func TestExpenditureReport(t *testing.T) {
-	report := models.ExpenditureReport{
-		StartDate: time.Now().AddDate(0, -1, 0),
-		EndDate:   time.Now(),
-		Categories: []models.CategorySpending{
-			{Category: "food", Amount: 500.00, Count: 25},
-			{Category: "transport", Amount: 200.00, Count: 15},
-			{Category: "entertainment", Amount: 150.00, Count: 5},
-		},
-		TotalSpent: 850.00,
-	}
-
-	assert.Len(t, report.Categories, 3)
-	assert.Equal(t, 850.00, report.TotalSpent)
-
-	// Verify total matches sum of categories
-	var sum float64
-	for _, cat := range report.Categories {
-		sum += cat.Amount
-	}
-	assert.Equal(t, sum, report.TotalSpent)
-}
-
 func TestContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	cancel() // Cancel immediately
+	cancel()
 
-	// Verify context is cancelled
 	select {
 	case <-ctx.Done():
 		// Expected
 	default:
 		t.Fatal("context should be cancelled")
 	}
+}
+
+func TestMultiCurrencyAccounts(t *testing.T) {
+	accounts := []models.Account{
+		{
+			ID:       uuid.New(),
+			UserID:   "user_123",
+			Name:     "Chase USD",
+			Type:     "bank",
+			Currency: "USD",
+			Balance:  100000.00,
+		},
+		{
+			ID:       uuid.New(),
+			UserID:   "user_123",
+			Name:     "M-Pesa KES",
+			Type:     "mobile_money",
+			Currency: "KES",
+			Balance:  5000000.00,
+		},
+		{
+			ID:       uuid.New(),
+			UserID:   "user_123",
+			Name:     "Barclays GBP",
+			Type:     "bank",
+			Currency: "GBP",
+			Balance:  50000.00,
+		},
+	}
+
+	// Verify multi-currency support
+	currencies := make(map[string]bool)
+	for _, a := range accounts {
+		currencies[a.Currency] = true
+	}
+
+	assert.True(t, currencies["USD"])
+	assert.True(t, currencies["KES"])
+	assert.True(t, currencies["GBP"])
 }

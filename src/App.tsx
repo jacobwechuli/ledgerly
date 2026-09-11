@@ -1,7 +1,7 @@
 import { useState } from 'react'
 
 type Endpoint = {
-  method: 'GET' | 'POST' | 'DELETE'
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE'
   path: string
   description: string
   body?: string
@@ -25,7 +25,39 @@ const sections: Section[] = [
         path: '/health',
         description: 'Server health check. No authentication required.',
         auth: false,
-        response: '{"status":"ok","service":"ledgerly-api","timestamp":"..."}',
+        response: '{"status":"ok","service":"ledgerly-api","version":"2.0","target":"high-net-worth"}',
+      },
+    ],
+  },
+  {
+    title: 'Accounts',
+    icon: '🏦',
+    endpoints: [
+      {
+        method: 'POST',
+        path: '/api/v1/accounts',
+        description: 'Create a new account (bank, mobile money, investment, or property)',
+        auth: true,
+        body: '{"name":"Chase Checking","type":"bank","sub_type":"checking","currency":"USD","balance":150000.00,"institution":"Chase Bank"}',
+      },
+      {
+        method: 'GET',
+        path: '/api/v1/accounts',
+        description: 'List all accounts (multi-currency, multi-type)',
+        auth: true,
+      },
+      {
+        method: 'PUT',
+        path: '/api/v1/accounts/{id}/balance',
+        description: 'Update account balance',
+        auth: true,
+        body: '{"balance":175000.00}',
+      },
+      {
+        method: 'DELETE',
+        path: '/api/v1/accounts/{id}',
+        description: 'Deactivate an account (soft delete)',
+        auth: true,
       },
     ],
   },
@@ -36,22 +68,14 @@ const sections: Section[] = [
       {
         method: 'POST',
         path: '/api/v1/transactions',
-        description: 'Create a new income or expense transaction',
+        description: 'Record a transaction linked to a specific account',
         auth: true,
-        body: '{"amount":150.00,"type":"expense","category":"food","description":"Groceries","source":"card","date":"2024-01-15T10:00:00Z"}',
-        response: '{"data":{"id":"uuid","amount":150.00,"type":"expense",...}}',
+        body: '{"account_id":"uuid","amount":5000.00,"currency":"USD","type":"expense","category":"travel","description":"Business class flight to London"}',
       },
       {
         method: 'GET',
         path: '/api/v1/transactions?page=1&page_size=20',
-        description: 'List all transactions (paginated)',
-        auth: true,
-        response: '{"data":[...],"page":1,"page_size":20,"total_count":100,"total_pages":5}',
-      },
-      {
-        method: 'GET',
-        path: '/api/v1/transactions/{id}',
-        description: 'Get a specific transaction by ID',
+        description: 'List transactions (paginated)',
         auth: true,
       },
       {
@@ -63,53 +87,90 @@ const sections: Section[] = [
     ],
   },
   {
-    title: 'Mobile Money',
-    icon: '📱',
+    title: 'Investments',
+    icon: '📈',
     endpoints: [
       {
         method: 'POST',
-        path: '/api/v1/mobile-money',
-        description: 'Record a mobile money transaction (M-Pesa, Airtel Money, etc.)',
+        path: '/api/v1/investments',
+        description: 'Add an investment holding (stocks, ETFs, crypto, bonds)',
         auth: true,
-        body: '{"transaction_id":"QKL3ABC123","amount":500.00,"type":"send","phone_number":"+254712345678","provider":"mpesa","counterparty_name":"John Doe","description":"Rent payment"}',
+        body: '{"account_id":"uuid","symbol":"AAPL","name":"Apple Inc.","type":"stock","quantity":500,"avg_cost_basis":150.00,"current_price":175.00,"currency":"USD"}',
       },
       {
         method: 'GET',
-        path: '/api/v1/mobile-money?page=1&page_size=20',
-        description: 'List mobile money transactions',
+        path: '/api/v1/investments',
+        description: 'List all investment holdings with unrealized gains',
+        auth: true,
+      },
+      {
+        method: 'DELETE',
+        path: '/api/v1/investments/{id}',
+        description: 'Remove an investment',
         auth: true,
       },
     ],
   },
   {
-    title: 'Budget Goals',
-    icon: '🎯',
+    title: 'Properties',
+    icon: '🏠',
     endpoints: [
       {
         method: 'POST',
-        path: '/api/v1/budget-goals',
-        description: 'Create a savings goal with target amount',
+        path: '/api/v1/properties',
+        description: 'Track real estate, vehicles, art, jewelry, or other assets',
         auth: true,
-        body: '{"name":"Emergency Fund","target_amount":10000.00,"category":"savings","deadline":"2024-12-31T00:00:00Z"}',
+        body: '{"account_id":"uuid","name":"Nairobi Apartment","type":"real_estate","current_value":25000000.00,"purchase_price":20000000.00,"currency":"KES","location":"Westlands, Nairobi"}',
       },
       {
         method: 'GET',
-        path: '/api/v1/budget-goals',
-        description: 'List all budget goals with progress',
+        path: '/api/v1/properties',
+        description: 'List all property and asset holdings',
         auth: true,
-      },
-      {
-        method: 'POST',
-        path: '/api/v1/budget-goals/{id}/contribute',
-        description: 'Add funds to a budget goal',
-        auth: true,
-        body: '{"amount":500.00}',
       },
       {
         method: 'DELETE',
-        path: '/api/v1/budget-goals/{id}',
-        description: 'Delete a budget goal',
+        path: '/api/v1/properties/{id}',
+        description: 'Remove a property/asset',
         auth: true,
+      },
+    ],
+  },
+  {
+    title: 'Net Worth',
+    icon: '💎',
+    endpoints: [
+      {
+        method: 'GET',
+        path: '/api/v1/net-worth/summary',
+        description: 'Get aggregated net worth in USD with breakdown (cash, investments, property)',
+        auth: true,
+        response: '{"data":{"total_usd":2500000,"cash_usd":500000,"investments_usd":1500000,"property_usd":500000,"change_pct_30d":2.04}}',
+      },
+      {
+        method: 'GET',
+        path: '/api/v1/net-worth/history?days=90',
+        description: 'Get daily net worth snapshots for charting',
+        auth: true,
+      },
+    ],
+  },
+  {
+    title: 'Currencies',
+    icon: '💱',
+    endpoints: [
+      {
+        method: 'GET',
+        path: '/api/v1/currencies',
+        description: 'List all supported currencies with exchange rates to USD',
+        auth: true,
+      },
+      {
+        method: 'GET',
+        path: '/api/v1/currencies/convert?from=KES&to=USD&amount=100000',
+        description: 'Convert between currencies',
+        auth: true,
+        response: '{"data":{"from_currency":"KES","to_currency":"USD","amount":100000,"result":770.00,"rate":0.0077}}',
       },
     ],
   },
@@ -120,14 +181,14 @@ const sections: Section[] = [
       {
         method: 'POST',
         path: '/api/v1/bills',
-        description: 'Create a recurring bill',
+        description: 'Create a recurring bill linked to an account',
         auth: true,
-        body: '{"name":"Electricity","amount":150.00,"category":"utilities","due_date":"2024-02-01T00:00:00Z","recurrence":"monthly","notes":"Kenya Power"}',
+        body: '{"account_id":"uuid","name":"Electricity","amount":15000.00,"currency":"KES","category":"utilities","due_date":"2024-02-01T00:00:00Z","recurrence":"monthly"}',
       },
       {
         method: 'GET',
         path: '/api/v1/bills?paid=false',
-        description: 'List bills (optionally filter by paid status)',
+        description: 'List bills (filter by paid status)',
         auth: true,
       },
       {
@@ -145,22 +206,34 @@ const sections: Section[] = [
     ],
   },
   {
-    title: 'Reports',
-    icon: '📊',
+    title: 'Budget Goals',
+    icon: '🎯',
     endpoints: [
       {
-        method: 'GET',
-        path: '/api/v1/reports/expenditure?start_date=2024-01-01&end_date=2024-01-31',
-        description: 'Get spending breakdown by category for a date range',
+        method: 'POST',
+        path: '/api/v1/budget-goals',
+        description: 'Create a large financial goal (property, education, retirement, etc.)',
         auth: true,
-        response: '{"data":{"categories":[{"category":"food","amount":500,"count":25}],"total_spent":700}}',
+        body: '{"name":"Beach House in Diani","target_amount":50000000.00,"currency":"KES","category":"property","deadline":"2026-12-31T00:00:00Z","priority":"high"}',
       },
       {
         method: 'GET',
-        path: '/api/v1/reports/summary',
-        description: 'Get total income, expenses, and net balance',
+        path: '/api/v1/budget-goals',
+        description: 'List all goals with progress tracking',
         auth: true,
-        response: '{"data":{"total_income":5000,"total_expense":3500,"net_balance":1500}}',
+      },
+      {
+        method: 'POST',
+        path: '/api/v1/budget-goals/{id}/contribute',
+        description: 'Add funds toward a goal',
+        auth: true,
+        body: '{"amount":5000000.00}',
+      },
+      {
+        method: 'DELETE',
+        path: '/api/v1/budget-goals/{id}',
+        description: 'Delete a goal',
+        auth: true,
       },
     ],
   },
@@ -171,9 +244,9 @@ const sections: Section[] = [
       {
         method: 'POST',
         path: '/api/v1/budget-templates',
-        description: 'Create a reusable budget template',
+        description: 'Create a reusable budget allocation template',
         auth: true,
-        body: '{"name":"50/30/20 Budget","description":"Classic allocation","categories":[{"category":"needs","allocated_pct":50},{"category":"wants","allocated_pct":30},{"category":"savings","allocated_pct":20}],"is_public":false}',
+        body: '{"name":"HNW Allocation","description":"High-net-worth portfolio","categories":[{"category":"investments","allocated_pct":60},{"category":"property","allocated_pct":25},{"category":"cash","allocated_pct":10},{"category":"philanthropy","allocated_pct":5}],"is_public":false}',
       },
       {
         method: 'GET',
@@ -184,7 +257,64 @@ const sections: Section[] = [
       {
         method: 'DELETE',
         path: '/api/v1/budget-templates/{id}',
-        description: 'Delete a budget template',
+        description: 'Delete a template',
+        auth: true,
+      },
+    ],
+  },
+  {
+    title: 'Reports',
+    icon: '📊',
+    endpoints: [
+      {
+        method: 'GET',
+        path: '/api/v1/reports/expenditure?start_date=2024-01-01&end_date=2024-01-31&currency=USD',
+        description: 'Spending breakdown by category (multi-currency aware)',
+        auth: true,
+      },
+      {
+        method: 'GET',
+        path: '/api/v1/reports/summary',
+        description: 'Total income, expenses, and net balance (all in USD)',
+        auth: true,
+      },
+    ],
+  },
+  {
+    title: 'Settings',
+    icon: '⚙️',
+    endpoints: [
+      {
+        method: 'GET',
+        path: '/api/v1/settings',
+        description: 'Get user settings (privacy mode, default currency, theme)',
+        auth: true,
+        response: '{"data":{"privacy_mode":true,"default_currency":"USD","theme":"dark"}}',
+      },
+      {
+        method: 'PUT',
+        path: '/api/v1/settings',
+        description: 'Update user settings',
+        auth: true,
+        body: '{"privacy_mode":true,"default_currency":"USD","theme":"dark"}',
+      },
+    ],
+  },
+  {
+    title: 'Tax',
+    icon: '🧾',
+    endpoints: [
+      {
+        method: 'GET',
+        path: '/api/v1/tax/capital-gains?year=2024',
+        description: 'Estimate unrealized capital gains and tax liability',
+        auth: true,
+        response: '{"data":{"year":2024,"unrealized_gains":250000,"estimated_tax":37500,"currency":"USD"}}',
+      },
+      {
+        method: 'GET',
+        path: '/api/v1/tax/records?year=2024',
+        description: 'Get tax records for a specific year',
         auth: true,
       },
     ],
@@ -196,17 +326,16 @@ const sections: Section[] = [
       {
         method: 'POST',
         path: '/api/v1/ai/chat',
-        description: 'Chat with AI about your finances (has access to your transaction data)',
+        description: 'Chat with AI about your finances (concierge tone, data-driven)',
         auth: true,
-        body: '{"messages":[{"role":"user","content":"How much did I spend on food last month?"}]}',
-        response: '{"data":{"response":"You spent $500 on food last month across 25 transactions..."}}',
+        body: '{"messages":[{"role":"user","content":"What\'s my current exposure to Kenyan Shillings?"}]}',
       },
       {
         method: 'POST',
-        path: '/api/v1/ai/suggest-budget',
-        description: 'Get AI-generated budget recommendations based on your spending history',
+        path: '/api/v1/ai/insights',
+        description: 'Generate concierge-style financial observations (not generic tips)',
         auth: true,
-        response: '{"data":{"categories":[{"category":"housing","recommended":1500,"percentage":30,"rationale":"..."}],"total_income":5000,"notes":"..."}}',
+        response: '{"data":[{"category":"currency","title":"USD Exposure Declined","description":"Your USD-denominated assets decreased 8% this month...","impact":"negative","priority":"high"}]}',
       },
     ],
   },
@@ -230,18 +359,21 @@ function App() {
               </div>
               <div>
                 <h1 className="text-xl font-bold text-white">Ledgerly API</h1>
-                <p className="text-xs text-gray-400">Personal Finance Backend • v1.0</p>
+                <p className="text-xs text-gray-400">Private Wealth Management • v2.0</p>
               </div>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3 flex-wrap">
               <span className="px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-medium">
-                Go 1.22
+                Multi-Currency
               </span>
               <span className="px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-medium">
-                PostgreSQL
+                Investments
               </span>
               <span className="px-3 py-1 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-400 text-xs font-medium">
-                Clerk Auth
+                Net Worth
+              </span>
+              <span className="px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-medium">
+                AI Insights
               </span>
             </div>
           </div>
@@ -287,6 +419,8 @@ function App() {
                 <code className="text-xs text-cyan-400 bg-gray-800 px-2 py-1 rounded block">
                   Bearer {'<clerk_jwt>'}
                 </code>
+                <h3 className="text-sm font-semibold text-gray-300 mt-4 mb-2">Currencies</h3>
+                <p className="text-xs text-gray-400">USD, KES, GBP, EUR, CHF, JPY, ZAR, NGN, AED, SGD</p>
                 <h3 className="text-sm font-semibold text-gray-300 mt-4 mb-2">Rate Limit</h3>
                 <p className="text-xs text-gray-400">60 requests/minute per user</p>
               </div>
@@ -325,6 +459,8 @@ function App() {
                                 ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
                                 : endpoint.method === 'POST'
                                 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                : endpoint.method === 'PUT'
+                                ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
                                 : 'bg-red-500/10 text-red-400 border border-red-500/20'
                             }`}
                           >
@@ -384,51 +520,51 @@ function App() {
 
             {/* Architecture Section */}
             <div className="mt-12 p-6 rounded-xl bg-gradient-to-br from-gray-900 to-gray-900/50 border border-gray-800">
-              <h3 className="text-lg font-bold text-white mb-4">🏗️ Architecture</h3>
+              <h3 className="text-lg font-bold text-white mb-4">🏗️ Architecture for High-Net-Worth Users</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="p-4 rounded-lg bg-gray-800/50 border border-gray-700">
-                  <h4 className="text-sm font-semibold text-emerald-400 mb-2">Authentication</h4>
+                  <h4 className="text-sm font-semibold text-emerald-400 mb-2">Multi-Currency</h4>
                   <p className="text-xs text-gray-400">
-                    Clerk JWT verification middleware. Server-side token validation with JWKS caching. User-scoped data access enforced at the data layer.
+                    First-class support for 10+ currencies. All amounts converted to USD for aggregate views. Real-time exchange rates.
                   </p>
                 </div>
                 <div className="p-4 rounded-lg bg-gray-800/50 border border-gray-700">
-                  <h4 className="text-sm font-semibold text-blue-400 mb-2">Rate Limiting</h4>
+                  <h4 className="text-sm font-semibold text-blue-400 mb-2">Net Worth Tracking</h4>
                   <p className="text-xs text-gray-400">
-                    Redis-backed sliding window rate limiter. Works correctly across multiple instances. 60 RPM default per user with configurable limits.
+                    Aggregate cash, investments, and property into a single net worth figure. Historical snapshots for trend analysis.
                   </p>
                 </div>
                 <div className="p-4 rounded-lg bg-gray-800/50 border border-gray-700">
-                  <h4 className="text-sm font-semibold text-purple-400 mb-2">AI Features</h4>
+                  <h4 className="text-sm font-semibold text-purple-400 mb-2">AI Concierge</h4>
                   <p className="text-xs text-gray-400">
-                    OpenAI-powered financial assistant. Chat endpoint with full financial context. Budget suggestions generated from transaction history.
+                    Sophisticated insights like "USD exposure dropped 8% this month" — not generic budgeting tips or gamified nudges.
                   </p>
                 </div>
               </div>
             </div>
 
-            {/* Deployment Info */}
+            {/* Design Philosophy */}
             <div className="mt-6 p-6 rounded-xl bg-gradient-to-br from-gray-900 to-gray-900/50 border border-gray-800">
-              <h3 className="text-lg font-bold text-white mb-4">🚀 Deployment</h3>
+              <h3 className="text-lg font-bold text-white mb-4">🎯 Design Philosophy</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <h4 className="text-sm font-semibold text-gray-300 mb-2">Stack</h4>
+                  <h4 className="text-sm font-semibold text-gray-300 mb-2">For Sophisticated Users</h4>
                   <ul className="text-xs text-gray-400 space-y-1">
-                    <li>• Go 1.22 with chi router</li>
-                    <li>• PostgreSQL for data persistence</li>
-                    <li>• Redis for distributed rate limiting</li>
-                    <li>• Clerk for authentication</li>
-                    <li>• OpenAI for AI features</li>
+                    <li>• No gamification or motivational language</li>
+                    <li>• Professional, discreet tone</li>
+                    <li>• Data-driven insights with exact numbers</li>
+                    <li>• Privacy mode for discretion</li>
+                    <li>• Multi-account, multi-currency support</li>
                   </ul>
                 </div>
                 <div>
-                  <h4 className="text-sm font-semibold text-gray-300 mb-2">Hosting</h4>
+                  <h4 className="text-sm font-semibold text-gray-300 mb-2">Comprehensive Tracking</h4>
                   <ul className="text-xs text-gray-400 space-y-1">
-                    <li>• Railway for backend deployment</li>
-                    <li>• Docker-based builds</li>
-                    <li>• Health check at /health</li>
-                    <li>• Graceful shutdown support</li>
-                    <li>• $PORT env var support</li>
+                    <li>• Bank accounts (multiple currencies)</li>
+                    <li>• Mobile money (M-Pesa, Airtel, etc.)</li>
+                    <li>• Investment portfolios (stocks, crypto)</li>
+                    <li>• Real estate & vehicles</li>
+                    <li>• Large goals (property, education)</li>
                   </ul>
                 </div>
               </div>
@@ -441,7 +577,7 @@ function App() {
       <footer className="border-t border-gray-800 mt-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center justify-between text-xs text-gray-500">
-            <span>Ledgerly API Backend • Built with Go</span>
+            <span>Ledgerly API v2.0 • Private Wealth Management Backend</span>
             <span>Source: backend/README.md for full documentation</span>
           </div>
         </div>

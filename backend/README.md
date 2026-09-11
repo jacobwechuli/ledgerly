@@ -1,6 +1,6 @@
 # Ledgerly API Backend
 
-A personal finance management API built with Go, PostgreSQL, and Clerk authentication.
+A sophisticated personal wealth management API built with Go, PostgreSQL, and Clerk authentication. Designed for high-net-worth users with multi-currency support, investment tracking, property management, and AI-powered financial insights.
 
 ## Architecture
 
@@ -17,6 +17,25 @@ A personal finance management API built with Go, PostgreSQL, and Clerk authentic
 ├── Dockerfile           # Multi-stage Docker build
 └── railway.json         # Railway deployment config
 ```
+
+## Key Features
+
+### For High-Net-Worth Users
+- **Multi-Account Aggregation** — Track multiple bank accounts, mobile money wallets, investment portfolios, and property assets
+- **Multi-Currency Support** — First-class support for USD, KES, GBP, EUR, CHF, JPY, ZAR, NGN, AED, SGD with real-time conversion
+- **Net Worth Tracking** — Aggregate cash, investments, and property into a single USD-denominated net worth figure, tracked over time
+- **Investment Portfolio** — Track stocks, ETFs, mutual funds, crypto, and bonds with unrealized gains/losses
+- **Property & Asset Tracking** — Real estate, vehicles, art, jewelry with purchase price and current valuation
+- **Privacy/Discreet Mode** — User-level setting to mask balances by default (for iPhone users who value discretion)
+- **Tax Liability Estimates** — Capital gains calculations and tax record tracking
+- **AI-Powered Insights** — Concierge-style observations (not generic budgeting tips) like "USD exposure dropped 8% this month"
+
+### Technical
+- **Clerk Authentication** — Server-side JWT verification on every protected route
+- **Redis Rate Limiting** — Distributed sliding window rate limiter that works across multiple instances
+- **PostgreSQL** — Robust relational database with proper indexing
+- **Graceful Shutdown** — Proper signal handling for production deployments
+- **Health Checks** — `/health` endpoint for monitoring
 
 ## Prerequisites
 
@@ -87,6 +106,8 @@ Returns server status. No authentication required.
 {
   "status": "ok",
   "service": "ledgerly-api",
+  "version": "2.0",
+  "target": "high-net-worth",
   "timestamp": "2024-01-15T10:30:00Z"
 }
 ```
@@ -103,6 +124,53 @@ Authorization: Bearer <clerk_jwt_token>
 
 ---
 
+### Accounts (Multi-Account Support)
+
+#### Create Account
+```
+POST /api/v1/accounts
+```
+
+**Body:**
+```json
+{
+  "name": "Chase Checking",
+  "type": "bank",
+  "sub_type": "checking",
+  "currency": "USD",
+  "balance": 150000.00,
+  "institution": "Chase Bank"
+}
+```
+
+**Valid values:**
+- `type`: `"bank"`, `"mobile_money"`, `"investment"`, `"property"`
+- `sub_type`: `"checking"`, `"savings"`, `"mpesa"`, `"stock_portfolio"`, `"crypto_wallet"`, `"real_estate"`, `"vehicle"`
+
+#### List Accounts
+```
+GET /api/v1/accounts
+```
+
+#### Update Account Balance
+```
+PUT /api/v1/accounts/{id}/balance
+```
+
+**Body:**
+```json
+{
+  "balance": 175000.00
+}
+```
+
+#### Delete Account (soft delete)
+```
+DELETE /api/v1/accounts/{id}
+```
+
+---
+
 ### Transactions
 
 #### Create Transaction
@@ -113,27 +181,22 @@ POST /api/v1/transactions
 **Body:**
 ```json
 {
-  "amount": 150.00,
+  "account_id": "uuid",
+  "amount": 5000.00,
+  "currency": "USD",
   "type": "expense",
-  "category": "food",
-  "description": "Grocery shopping",
-  "source": "card",
+  "category": "travel",
+  "description": "Business class flight to London",
   "date": "2024-01-15T10:00:00Z"
 }
 ```
 
 **Valid values:**
-- `type`: `"income"`, `"expense"`
-- `source`: `"bank"`, `"cash"`, `"mobile_money"`, `"card"`
+- `type`: `"income"`, `"expense"`, `"transfer"`
 
 #### List Transactions
 ```
 GET /api/v1/transactions?page=1&page_size=20
-```
-
-#### Get Transaction
-```
-GET /api/v1/transactions/{id}
 ```
 
 #### Delete Transaction
@@ -143,75 +206,136 @@ DELETE /api/v1/transactions/{id}
 
 ---
 
-### Mobile Money Transactions
+### Investments (Stocks, Funds, Crypto)
 
-#### Create Mobile Money Transaction
+#### Create Investment
 ```
-POST /api/v1/mobile-money
+POST /api/v1/investments
 ```
 
 **Body:**
 ```json
 {
-  "transaction_id": "QKL3ABC123",
-  "amount": 500.00,
-  "type": "send",
-  "phone_number": "+254712345678",
-  "provider": "mpesa",
-  "counterparty_name": "John Doe",
-  "description": "Rent payment",
-  "date": "2024-01-15T10:00:00Z"
+  "account_id": "uuid",
+  "symbol": "AAPL",
+  "name": "Apple Inc.",
+  "type": "stock",
+  "quantity": 500,
+  "avg_cost_basis": 150.00,
+  "current_price": 175.00,
+  "currency": "USD"
 }
 ```
 
 **Valid values:**
-- `type`: `"send"`, `"receive"`, `"paybill"`, `"buygoods"`
-- `provider`: `"mpesa"`, `"airtel_money"`, `"tigo_pesa"`
+- `type`: `"stock"`, `"etf"`, `"mutual_fund"`, `"crypto"`, `"bond"`
 
-#### List Mobile Money Transactions
+#### List Investments
 ```
-GET /api/v1/mobile-money?page=1&page_size=20
+GET /api/v1/investments
+```
+
+#### Delete Investment
+```
+DELETE /api/v1/investments/{id}
 ```
 
 ---
 
-### Budget Goals
+### Properties & Assets
 
-#### Create Budget Goal
+#### Create Property
 ```
-POST /api/v1/budget-goals
-```
-
-**Body:**
-```json
-{
-  "name": "Emergency Fund",
-  "target_amount": 10000.00,
-  "category": "savings",
-  "deadline": "2024-12-31T00:00:00Z"
-}
-```
-
-#### List Budget Goals
-```
-GET /api/v1/budget-goals
-```
-
-#### Contribute to Goal
-```
-POST /api/v1/budget-goals/{id}/contribute
+POST /api/v1/properties
 ```
 
 **Body:**
 ```json
 {
-  "amount": 500.00
+  "account_id": "uuid",
+  "name": "Nairobi Apartment",
+  "type": "real_estate",
+  "description": "3-bedroom apartment in Westlands",
+  "current_value": 25000000.00,
+  "purchase_price": 20000000.00,
+  "currency": "KES",
+  "location": "Westlands, Nairobi",
+  "purchase_date": "2020-06-15T00:00:00Z"
 }
 ```
 
-#### Delete Budget Goal
+**Valid values:**
+- `type`: `"real_estate"`, `"vehicle"`, `"art"`, `"jewelry"`, `"other"`
+
+#### List Properties
 ```
-DELETE /api/v1/budget-goals/{id}
+GET /api/v1/properties
+```
+
+#### Delete Property
+```
+DELETE /api/v1/properties/{id}
+```
+
+---
+
+### Net Worth
+
+#### Get Net Worth Summary
+```
+GET /api/v1/net-worth/summary
+```
+
+Returns aggregated net worth in USD with breakdown by category.
+
+**Response:**
+```json
+{
+  "data": {
+    "total_usd": 2500000.00,
+    "cash_usd": 500000.00,
+    "investments_usd": 1500000.00,
+    "property_usd": 500000.00,
+    "change_30d": 50000.00,
+    "change_pct_30d": 2.04
+  }
+}
+```
+
+#### Get Net Worth History
+```
+GET /api/v1/net-worth/history?days=90
+```
+
+Returns daily net worth snapshots for charting.
+
+---
+
+### Currencies
+
+#### List Currencies
+```
+GET /api/v1/currencies
+```
+
+Returns all supported currencies with exchange rates to USD.
+
+#### Convert Currency
+```
+GET /api/v1/currencies/convert?from=KES&to=USD&amount=100000
+```
+
+**Response:**
+```json
+{
+  "data": {
+    "from_currency": "KES",
+    "to_currency": "USD",
+    "amount": 100000.00,
+    "result": 770.00,
+    "rate": 0.0077
+  }
+}
 ```
 
 ---
@@ -226,8 +350,10 @@ POST /api/v1/bills
 **Body:**
 ```json
 {
+  "account_id": "uuid",
   "name": "Electricity Bill",
-  "amount": 150.00,
+  "amount": 15000.00,
+  "currency": "KES",
   "category": "utilities",
   "due_date": "2024-02-01T00:00:00Z",
   "recurrence": "monthly",
@@ -235,14 +361,10 @@ POST /api/v1/bills
 }
 ```
 
-**Valid recurrence values:** `"monthly"`, `"weekly"`, `"yearly"`, `"once"`
-
 #### List Bills
 ```
 GET /api/v1/bills?paid=false
 ```
-
-Optional query parameter `paid` filters by payment status.
 
 #### Mark Bill as Paid
 ```
@@ -256,36 +378,50 @@ DELETE /api/v1/bills/{id}
 
 ---
 
-### Reports
+### Budget Goals (Large Goals)
 
-#### Expenditure Report
+#### Create Budget Goal
 ```
-GET /api/v1/reports/expenditure?start_date=2024-01-01&end_date=2024-01-31
+POST /api/v1/budget-goals
 ```
 
-Returns spending breakdown by category for the given date range.
-
-**Response:**
+**Body:**
 ```json
 {
-  "data": {
-    "start_date": "2024-01-01T00:00:00Z",
-    "end_date": "2024-01-31T00:00:00Z",
-    "categories": [
-      {"category": "food", "amount": 500.00, "count": 25},
-      {"category": "transport", "amount": 200.00, "count": 15}
-    ],
-    "total_spent": 700.00
-  }
+  "name": "Beach House in Diani",
+  "target_amount": 50000000.00,
+  "currency": "KES",
+  "category": "property",
+  "deadline": "2026-12-31T00:00:00Z",
+  "priority": "high"
 }
 ```
 
-#### Financial Summary
+**Valid values:**
+- `category`: `"property"`, `"education"`, `"retirement"`, `"travel"`, `"business"`
+- `priority`: `"high"`, `"medium"`, `"low"`
+
+#### List Budget Goals
 ```
-GET /api/v1/reports/summary
+GET /api/v1/budget-goals
 ```
 
-Returns total income, expenses, and net balance.
+#### Contribute to Goal
+```
+POST /api/v1/budget-goals/{id}/contribute
+```
+
+**Body:**
+```json
+{
+  "amount": 5000000.00
+}
+```
+
+#### Delete Budget Goal
+```
+DELETE /api/v1/budget-goals/{id}
+```
 
 ---
 
@@ -299,12 +435,13 @@ POST /api/v1/budget-templates
 **Body:**
 ```json
 {
-  "name": "50/30/20 Budget",
-  "description": "Classic budget allocation",
+  "name": "HNW Allocation",
+  "description": "High-net-worth portfolio allocation",
   "categories": [
-    {"category": "needs", "allocated_pct": 50.00},
-    {"category": "wants", "allocated_pct": 30.00},
-    {"category": "savings", "allocated_pct": 20.00}
+    {"category": "investments", "allocated_pct": 60.00},
+    {"category": "property", "allocated_pct": 25.00},
+    {"category": "cash", "allocated_pct": 10.00},
+    {"category": "philanthropy", "allocated_pct": 5.00}
   ],
   "is_public": false
 }
@@ -315,11 +452,111 @@ POST /api/v1/budget-templates
 GET /api/v1/budget-templates
 ```
 
-Returns user's own templates plus public templates.
-
 #### Delete Budget Template
 ```
 DELETE /api/v1/budget-templates/{id}
+```
+
+---
+
+### Reports
+
+#### Expenditure Report
+```
+GET /api/v1/reports/expenditure?start_date=2024-01-01&end_date=2024-01-31&currency=USD
+```
+
+Returns spending breakdown by category, optionally converted to a specific currency.
+
+**Response:**
+```json
+{
+  "data": {
+    "start_date": "2024-01-01T00:00:00Z",
+    "end_date": "2024-01-31T00:00:00Z",
+    "categories": [
+      {"category": "travel", "amount": 15000.00, "count": 3},
+      {"category": "dining", "amount": 5000.00, "count": 12}
+    ],
+    "total_spent": 20000.00,
+    "currency": "USD"
+  }
+}
+```
+
+#### Financial Summary
+```
+GET /api/v1/reports/summary
+```
+
+Returns total income, expenses, and net balance (all in USD).
+
+---
+
+### User Settings
+
+#### Get Settings
+```
+GET /api/v1/settings
+```
+
+Returns user preferences including privacy mode.
+
+**Response:**
+```json
+{
+  "data": {
+    "user_id": "user_123",
+    "privacy_mode": true,
+    "default_currency": "USD",
+    "theme": "dark",
+    "updated_at": "2024-01-15T10:30:00Z"
+  }
+}
+```
+
+#### Update Settings
+```
+PUT /api/v1/settings
+```
+
+**Body:**
+```json
+{
+  "privacy_mode": true,
+  "default_currency": "USD",
+  "theme": "dark"
+}
+```
+
+---
+
+### Tax
+
+#### Estimate Capital Gains
+```
+GET /api/v1/tax/capital-gains?year=2024
+```
+
+Returns unrealized capital gains and estimated tax liability.
+
+**Response:**
+```json
+{
+  "data": {
+    "year": 2024,
+    "unrealized_gains": 250000.00,
+    "estimated_tax_rate": 0.15,
+    "estimated_tax": 37500.00,
+    "currency": "USD",
+    "note": "Estimate based on 15% long-term capital gains rate. Consult a tax professional for accurate figures."
+  }
+}
+```
+
+#### Get Tax Records
+```
+GET /api/v1/tax/records?year=2024
 ```
 
 ---
@@ -335,33 +572,47 @@ POST /api/v1/ai/chat
 ```json
 {
   "messages": [
-    {"role": "user", "content": "How much did I spend on food last month?"}
+    {"role": "user", "content": "What's my current exposure to Kenyan Shillings?"}
   ]
 }
 ```
 
-The AI has access to the user's financial context (transactions, goals, bills) and can answer questions about their finances.
+The AI has access to the user's complete financial context (accounts, transactions, investments, properties) and provides sophisticated, data-driven answers in a professional tone.
 
-#### Get Budget Suggestion
+#### Get AI Insights
 ```
-POST /api/v1/ai/suggest-budget
+POST /api/v1/ai/insights
 ```
 
-Analyzes the user's transaction history and generates personalized budget recommendations.
+Generates concierge-style financial observations (not generic budgeting tips).
 
 **Response:**
 ```json
 {
-  "data": {
-    "categories": [
-      {"category": "housing", "recommended": 1500, "percentage": 30, "rationale": "..."},
-      {"category": "food", "recommended": 750, "percentage": 15, "rationale": "..."}
-    ],
-    "total_income": 5000,
-    "notes": "Based on your spending patterns..."
-  }
+  "data": [
+    {
+      "id": "insight_1",
+      "category": "currency",
+      "title": "USD Exposure Declined",
+      "description": "Your USD-denominated assets decreased by 8% this month due to KES strengthening against the dollar. Consider rebalancing if USD exposure is a strategic priority.",
+      "impact": "negative",
+      "priority": "high",
+      "generated_at": "2024-01-15T10:30:00Z"
+    },
+    {
+      "id": "insight_2",
+      "category": "portfolio",
+      "title": "Tech Concentration Risk",
+      "description": "Technology stocks represent 45% of your equity portfolio, exceeding typical diversification guidelines. Consider reducing exposure to AAPL and MSFT.",
+      "impact": "negative",
+      "priority": "high",
+      "generated_at": "2024-01-15T10:30:00Z"
+    }
+  ]
 }
 ```
+
+**Insight categories:** `portfolio`, `cash_flow`, `currency`, `tax`, `goals`
 
 ---
 
@@ -430,6 +681,16 @@ go test -v ./internal/store/...
 - **Input Validation**: Request body validation using go-playground/validator
 - **CORS**: Configurable CORS middleware
 - **SQL Injection**: Parameterized queries via pgx
+- **Privacy Mode**: User-level setting to mask sensitive balances
+
+## Design Philosophy
+
+Ledgerly is built for sophisticated users who value:
+- **Discretion** — No gamification, no emojis, no motivational language
+- **Precision** — Exact numbers, specific percentages, data-driven insights
+- **Multi-currency** — Seamless handling of USD, KES, GBP, EUR, and more
+- **Comprehensive tracking** — Cash, investments, property, all in one place
+- **Professional tone** — Like a senior relationship manager at a private bank
 
 ## License
 

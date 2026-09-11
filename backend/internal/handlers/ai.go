@@ -24,9 +24,9 @@ type AIHandler struct {
 
 func NewAIHandler(s *store.Store, openAIKey string) *AIHandler {
 	return &AIHandler{
-		store:    s,
-		validate: validator.New(),
-		openAIKey: openAIKey,
+		store:      s,
+		validate:   validator.New(),
+		openAIKey:  openAIKey,
 		httpClient: &http.Client{Timeout: 30 * time.Second},
 	}
 }
@@ -34,7 +34,7 @@ func NewAIHandler(s *store.Store, openAIKey string) *AIHandler {
 func (h *AIHandler) Routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/chat", h.Chat)
-	mux.HandleFunc("/suggest-budget", h.SuggestBudget)
+	mux.HandleFunc("/insights", h.Insights)
 	return mux
 }
 
@@ -69,13 +69,21 @@ func (h *AIHandler) Chat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Build system prompt with financial context
-	systemPrompt := fmt.Sprintf(`You are Ledgerly AI, a helpful personal finance assistant. You help users understand their finances, track spending, and make better financial decisions.
+	// Build system prompt with financial context - concierge tone
+	systemPrompt := fmt.Sprintf(`You are Ledgerly AI, a sophisticated private wealth concierge assistant serving high-net-worth clients. Your tone is professional, discreet, and insightful — like a senior relationship manager at a private bank.
 
-Here is the user's current financial context:
+You provide clear, data-driven answers about the client's finances. You never use gamified language, emojis, or motivational platitudes. You speak with authority and precision.
+
+Here is the client's current financial position:
 %s
 
-Answer the user's questions based on their financial data. Be specific with numbers when relevant. If you don't have enough data to answer accurately, say so. Always be encouraging and helpful about financial management.`, financialContext)
+When answering questions:
+- Be specific with numbers and percentages
+- Reference actual account balances and transaction data
+- Provide context for changes (e.g., "Your USD exposure decreased 8% this month due to...")
+- Offer strategic observations, not generic advice
+- Maintain discretion — never suggest the client is "doing well" or "needs improvement" in a judgmental way
+- Focus on actionable insights and risk assessment`, financialContext)
 
 	// Build messages for OpenAI
 	messages := []map[string]string{
@@ -101,8 +109,8 @@ Answer the user's questions based on their financial data. Be specific with numb
 	}})
 }
 
-// SuggestBudget generates budget recommendations from transaction history
-func (h *AIHandler) SuggestBudget(w http.ResponseWriter, r *http.Request) {
+// Insights generates concierge-style observations about the user's finances
+func (h *AIHandler) Insights(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		respondJSON(w, http.StatusMethodNotAllowed, models.APIError{Error: "method not allowed"})
 		return
@@ -121,32 +129,67 @@ func (h *AIHandler) SuggestBudget(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	totalIncome, totalExpense, err := h.store.GetTransactionSummary(r.Context(), userID)
+	// Get net worth summary
+	netWorth, err := h.store.GetNetWorthSummary(r.Context(), userID)
 	if err != nil {
-		respondJSON(w, http.StatusInternalServerError, models.APIError{Error: "failed to get summary"})
+		respondJSON(w, http.StatusInternalServerError, models.APIError{Error: "failed to fetch net worth"})
 		return
 	}
 
-	prompt := fmt.Sprintf(`Based on the following financial data, suggest a monthly budget allocation. 
-Return your response as a JSON object with this exact structure:
-{
-  "categories": [
-    {"category": "category_name", "recommended": amount, "percentage": pct, "rationale": "why this allocation"}
-  ],
-  "notes": "general budget advice for this user"
-}
+	// Get currency exposure
+	currencyExposure, err := h.store.GetCurrencyExposure(r.Context(), userID)
+	if err != nil {
+		respondJSON(w, http.StatusInternalServerError, models.APIError{Error: "failed to analyze currency exposure"})
+		return
+	}
 
-Financial data:
+	// Estimate capital gains
+	capitalGains, err := h.store.EstimateCapitalGains(r.Context(), userID, time.Now().Year())
+	if err != nil {
+		respondJSON(w, http.StatusInternalServerError, models.APIError{Error: "failed to estimate capital gains"})
+		return
+	}
+
+	prompt := fmt.Sprintf(`You are a senior private wealth advisor generating a concise financial briefing for a high-net-worth client. Analyze the following data and generate 3-5 key insights that a relationship manager would highlight in a quarterly review.
+
+Each insight should be:
+- Specific and data-driven (use actual numbers)
+- Actionable or risk-aware
+- Professional in tone (no emojis, no gamification, no motivational language)
+- Categorized as: portfolio, cash_flow, currency, tax, or goals
+- Rated by priority: high, medium, or low
+
+Format your response as a JSON array of objects with these fields:
+- "category": one of "portfolio", "cash_flow", "currency", "tax", "goals"
+- "title": brief headline (max 8 words)
+- "description": detailed observation (2-3 sentences)
+- "impact": "positive", "negative", or "neutral"
+- "priority": "high", "medium", or "low"
+
+Financial Data:
 %s
 
-Total monthly income: %.2f
-Total monthly expenses: %.2f
+Net Worth Summary:
+- Total: $%.2f USD
+- Cash: $%.2f USD
+- Investments: $%.2f USD
+- Property: $%.2f USD
+- 30-day change: %.2f%%
 
-Suggest allocations for common categories like: housing, food, transport, entertainment, savings, utilities, healthcare, education.
-Make sure percentages add up to 100 and recommended amounts are based on the income level.`, financialContext, totalIncome, totalExpense)
+Currency Exposure (last 30 days):
+%v
+
+Unrealized Capital Gains: $%.2f USD
+
+Generate insights that a sophisticated client would find valuable. Focus on:
+- Portfolio concentration risks
+- Currency exposure changes
+- Tax implications of unrealized gains
+- Goal progress relative to deadlines
+- Cash flow patterns and anomalies`, financialContext, netWorth.TotalUSD, netWorth.CashUSD, netWorth.InvestmentsUSD, netWorth.PropertyUSD, netWorth.ChangePct30d, currencyExposure, capitalGains)
 
 	messages := []map[string]string{
-		{"role": "system", "content": "You are a financial advisor AI. Always respond with valid JSON when asked."},
+		{"role": "system", "content": "You are a private wealth advisor. Always respond with valid JSON when asked."},
 		{"role": "user", "content": prompt},
 	}
 
@@ -156,25 +199,47 @@ Make sure percentages add up to 100 and recommended amounts are based on the inc
 		return
 	}
 
-	// Try to parse the AI response as a BudgetSuggestion
-	var suggestion models.BudgetSuggestion
-	if err := json.Unmarshal([]byte(response), &suggestion); err != nil {
+	// Try to parse the AI response as an array of insights
+	var insights []models.AIInsight
+	if err := json.Unmarshal([]byte(response), &insights); err != nil {
 		// If parsing fails, return the raw response
 		respondJSON(w, http.StatusOK, models.APIResponse{Data: map[string]interface{}{
 			"raw_response": response,
-			"total_income": totalIncome,
-			"total_expense": totalExpense,
+			"generated_at": time.Now(),
 		}})
 		return
 	}
 
-	suggestion.TotalIncome = totalIncome
-	respondJSON(w, http.StatusOK, models.APIResponse{Data: suggestion})
+	// Add IDs and timestamps
+	for i := range insights {
+		insights[i].ID = fmt.Sprintf("insight_%d", i+1)
+		insights[i].GeneratedAt = time.Now()
+	}
+
+	respondJSON(w, http.StatusOK, models.APIResponse{Data: insights})
 }
 
 func (h *AIHandler) buildFinancialContext(ctx context.Context, userID string) (string, error) {
+	// Get accounts
+	accounts, err := h.store.GetAccounts(ctx, userID)
+	if err != nil {
+		return "", err
+	}
+
 	// Get recent transactions
-	transactions, _, err := h.store.GetTransactions(ctx, userID, 1, 50)
+	transactions, _, err := h.store.GetTransactions(ctx, userID, 1, 30)
+	if err != nil {
+		return "", err
+	}
+
+	// Get investments
+	investments, err := h.store.GetInvestments(ctx, userID)
+	if err != nil {
+		return "", err
+	}
+
+	// Get properties
+	properties, err := h.store.GetProperties(ctx, userID)
 	if err != nil {
 		return "", err
 	}
@@ -191,43 +256,47 @@ func (h *AIHandler) buildFinancialContext(ctx context.Context, userID string) (s
 		return "", err
 	}
 
-	// Get expenditure report for last 30 days
-	thirtyDaysAgo := time.Now().AddDate(0, -1, 0)
-	report, err := h.store.GetExpenditureReport(ctx, userID, thirtyDaysAgo, time.Now())
-	if err != nil {
-		return "", err
-	}
-
 	var context bytes.Buffer
 
-	context.WriteString("Recent Transactions (last 50):\n")
-	for _, t := range transactions {
-		context.WriteString(fmt.Sprintf("- %s: %s %.2f (%s, %s) on %s\n",
-			t.Type, t.Description, t.Amount, t.Category, t.Source, t.Date.Format("2006-01-02")))
+	context.WriteString("ACCOUNTS:\n")
+	for _, a := range accounts {
+		context.WriteString(fmt.Sprintf("- %s (%s, %s): %.2f %s\n",
+			a.Name, a.Type, a.SubType, a.Balance, a.Currency))
 	}
 
-	context.WriteString("\nBudget Goals:\n")
+	context.WriteString("\nRECENT TRANSACTIONS (last 30):\n")
+	for _, t := range transactions {
+		context.WriteString(fmt.Sprintf("- %s: %s %.2f %s (%s) on %s\n",
+			t.Type, t.Description, t.Amount, t.Currency, t.Category, t.Date.Format("2006-01-02")))
+	}
+
+	context.WriteString("\nINVESTMENTS:\n")
+	for _, i := range investments {
+		context.WriteString(fmt.Sprintf("- %s (%s): %.4f units @ %.2f %s, unrealized gain: %.2f %s\n",
+			i.Symbol, i.Type, i.Quantity, i.CurrentPrice, i.Currency, i.UnrealizedGain, i.Currency))
+	}
+
+	context.WriteString("\nPROPERTIES:\n")
+	for _, p := range properties {
+		context.WriteString(fmt.Sprintf("- %s (%s): %.2f %s (purchased: %.2f %s)\n",
+			p.Name, p.Type, p.CurrentValue, p.Currency, p.PurchasePrice, p.Currency))
+	}
+
+	context.WriteString("\nBUDGET GOALS:\n")
 	for _, g := range goals {
 		progress := 0.0
 		if g.TargetAmount > 0 {
 			progress = (g.CurrentAmount / g.TargetAmount) * 100
 		}
-		context.WriteString(fmt.Sprintf("- %s: %.2f/%.2f (%.1f%% complete) - %s\n",
-			g.Name, g.CurrentAmount, g.TargetAmount, progress, g.Status))
+		context.WriteString(fmt.Sprintf("- %s: %.2f/%.2f %s (%.1f%%) - %s priority\n",
+			g.Name, g.CurrentAmount, g.TargetAmount, g.Currency, progress, g.Priority))
 	}
 
-	context.WriteString("\nUpcoming Bills:\n")
+	context.WriteString("\nUPCOMING BILLS:\n")
 	for _, b := range bills {
-		context.WriteString(fmt.Sprintf("- %s: %.2f due %s (%s)\n",
-			b.Name, b.Amount, b.DueDate.Format("2006-01-02"), b.Recurrence))
+		context.WriteString(fmt.Sprintf("- %s: %.2f %s due %s (%s)\n",
+			b.Name, b.Amount, b.Currency, b.DueDate.Format("2006-01-02"), b.Recurrence))
 	}
-
-	context.WriteString("\nSpending by Category (last 30 days):\n")
-	for _, cs := range report.Categories {
-		context.WriteString(fmt.Sprintf("- %s: %.2f (%d transactions)\n",
-			cs.Category, cs.Amount, cs.Count))
-	}
-	context.WriteString(fmt.Sprintf("Total spent: %.2f\n", report.TotalSpent))
 
 	return context.String(), nil
 }
@@ -238,9 +307,9 @@ func (h *AIHandler) callOpenAI(ctx context.Context, messages []map[string]string
 	}
 
 	requestBody := map[string]interface{}{
-		"model":    "gpt-4o-mini",
-		"messages": messages,
-		"max_tokens": 1000,
+		"model":       "gpt-4o",
+		"messages":    messages,
+		"max_tokens":  1500,
 		"temperature": 0.7,
 	}
 
