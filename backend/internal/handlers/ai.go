@@ -1,4 +1,4 @@
-package handlers
+﻿package handlers
 
 import (
 	"bytes"
@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/go-playground/validator/v10"
 	"github.com/ledgerly/backend/internal/auth"
 	"github.com/ledgerly/backend/internal/models"
@@ -18,32 +19,28 @@ import (
 type AIHandler struct {
 	store      *store.Store
 	validate   *validator.Validate
-	openAIKey  string
+	groqAPIKey  string
 	httpClient *http.Client
 }
 
-func NewAIHandler(s *store.Store, openAIKey string) *AIHandler {
+func NewAIHandler(s *store.Store, groqAPIKey  string) *AIHandler {
 	return &AIHandler{
 		store:      s,
 		validate:   validator.New(),
-		openAIKey:  openAIKey,
+		groqAPIKey:  groqAPIKey,
 		httpClient: &http.Client{Timeout: 30 * time.Second},
 	}
 }
 
-func (h *AIHandler) Routes() http.Handler {
-	mux := http.NewServeMux()
-	mux.HandleFunc("/chat", h.Chat)
-	mux.HandleFunc("/insights", h.Insights)
-	return mux
+func (h *AIHandler) Routes() chi.Router {
+	r := chi.NewRouter()
+	r.Post("/chat", h.Chat)
+	r.Post("/insights", h.Insights)
+	return r
 }
 
 // Chat handles AI chat requests about the user's finances
 func (h *AIHandler) Chat(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		respondJSON(w, http.StatusMethodNotAllowed, models.APIError{Error: "method not allowed"})
-		return
-	}
 
 	userID := auth.GetUserID(r.Context())
 	if userID == "" {
@@ -80,12 +77,12 @@ Here is the client's current financial position:
 When answering questions:
 - Be specific with numbers and percentages
 - Reference actual account balances and transaction data
-- Provide context for changes (e.g., "Your USD exposure decreased 8% this month due to...")
+- Provide context for changes (e.g., "Your USD exposure decreased 8%% this month due to...")
 - Offer strategic observations, not generic advice
 - Maintain discretion — never suggest the client is "doing well" or "needs improvement" in a judgmental way
 - Focus on actionable insights and risk assessment`, financialContext)
 
-	// Build messages for OpenAI
+	// Build messages for Groq
 	messages := []map[string]string{
 		{"role": "system", "content": systemPrompt},
 	}
@@ -97,8 +94,8 @@ When answering questions:
 		})
 	}
 
-	// Call OpenAI
-	response, err := h.callOpenAI(r.Context(), messages)
+	// Call Groq
+	response, err := h.callGroq(r.Context(), messages)
 	if err != nil {
 		respondJSON(w, http.StatusInternalServerError, models.APIError{Error: "AI service error", Message: err.Error()})
 		return
@@ -111,10 +108,6 @@ When answering questions:
 
 // Insights generates concierge-style observations about the user's finances
 func (h *AIHandler) Insights(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		respondJSON(w, http.StatusMethodNotAllowed, models.APIError{Error: "method not allowed"})
-		return
-	}
 
 	userID := auth.GetUserID(r.Context())
 	if userID == "" {
@@ -193,7 +186,7 @@ Generate insights that a sophisticated client would find valuable. Focus on:
 		{"role": "user", "content": prompt},
 	}
 
-	response, err := h.callOpenAI(r.Context(), messages)
+	response, err := h.callGroq(r.Context(), messages)
 	if err != nil {
 		respondJSON(w, http.StatusInternalServerError, models.APIError{Error: "AI service error", Message: err.Error()})
 		return
@@ -301,13 +294,13 @@ func (h *AIHandler) buildFinancialContext(ctx context.Context, userID string) (s
 	return context.String(), nil
 }
 
-func (h *AIHandler) callOpenAI(ctx context.Context, messages []map[string]string) (string, error) {
-	if h.openAIKey == "" {
-		return "AI features are not configured. Please set OPENAI_API_KEY.", nil
+func (h *AIHandler) callGroq(ctx context.Context, messages []map[string]string) (string, error) {
+	if h.groqAPIKey == "" {
+		return "AI features are not configured. Please set GROQ_API_KEY.", nil
 	}
 
 	requestBody := map[string]interface{}{
-		"model":       "gpt-4o",
+		"model":       "llama-3.3-70b-versatile",
 		"messages":    messages,
 		"max_tokens":  1500,
 		"temperature": 0.7,
@@ -318,17 +311,17 @@ func (h *AIHandler) callOpenAI(ctx context.Context, messages []map[string]string
 		return "", fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", "https://api.openai.com/v1/chat/completions", bytes.NewReader(bodyBytes))
+	req, err := http.NewRequestWithContext(ctx, "POST", "https://api.groq.com/openai/v1/chat/completions", bytes.NewReader(bodyBytes))
 	if err != nil {
 		return "", fmt.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+h.openAIKey)
+	req.Header.Set("Authorization", "Bearer "+h.groqAPIKey)
 
 	resp, err := h.httpClient.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("failed to call OpenAI: %w", err)
+		return "", fmt.Errorf("failed to call Groq: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -338,7 +331,7 @@ func (h *AIHandler) callOpenAI(ctx context.Context, messages []map[string]string
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("OpenAI API error (status %d): %s", resp.StatusCode, string(respBody))
+		return "", fmt.Errorf("Groq API error (status %d): %s", resp.StatusCode, string(respBody))
 	}
 
 	var openAIResp struct {
@@ -350,11 +343,11 @@ func (h *AIHandler) callOpenAI(ctx context.Context, messages []map[string]string
 	}
 
 	if err := json.Unmarshal(respBody, &openAIResp); err != nil {
-		return "", fmt.Errorf("failed to parse OpenAI response: %w", err)
+		return "", fmt.Errorf("failed to parse Groq response: %w", err)
 	}
 
 	if len(openAIResp.Choices) == 0 {
-		return "", fmt.Errorf("no response from OpenAI")
+		return "", fmt.Errorf("no response from Groq")
 	}
 
 	return openAIResp.Choices[0].Message.Content, nil

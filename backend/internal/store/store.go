@@ -1,4 +1,4 @@
-package store
+﻿package store
 
 import (
 	"context"
@@ -463,20 +463,23 @@ func (s *Store) GetNetWorthHistory(ctx context.Context, userID string, days int)
 		days = 30
 	}
 
+	// Compute the cutoff date in Go to avoid any SQL type ambiguity.
+	cutoff := time.Now().AddDate(0, 0, -days).Format("2006-01-02")
+
 	query := `
 		SELECT id, user_id, date, total_usd, cash_usd, invest_usd, prop_usd, created_at
 		FROM net_worth_snapshots
-		WHERE user_id = $1 AND date >= CURRENT_DATE - $2
+		WHERE user_id = $1 AND date >= $2
 		ORDER BY date ASC
 	`
 
-	rows, err := s.pool.Query(ctx, query, userID, days)
+	rows, err := s.pool.Query(ctx, query, userID, cutoff)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var snapshots []models.NetWorthSnapshot
+	snapshots := []models.NetWorthSnapshot{}
 	for rows.Next() {
 		var snap models.NetWorthSnapshot
 		if err := rows.Scan(&snap.ID, &snap.UserID, &snap.Date, &snap.TotalUSD,
@@ -484,6 +487,10 @@ func (s *Store) GetNetWorthHistory(ctx context.Context, userID string, days int)
 			return nil, err
 		}
 		snapshots = append(snapshots, snap)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 
 	return snapshots, nil

@@ -13,7 +13,7 @@ type Config struct {
 	RedisURL        string
 	ClerkSecretKey  string
 	ClerkIssuerURL  string
-	OpenAIAPIKey    string
+	GroqAPIKey    string
 	Environment     string
 	RateLimitRPM    int
 }
@@ -27,7 +27,7 @@ func Load() (*Config, error) {
 	redisURL := getEnv("REDIS_URL", "")
 	clerkSecretKey := getEnv("CLERK_SECRET_KEY", "")
 	clerkIssuerURL := getEnv("CLERK_ISSUER_URL", "https://clerk.ledgerly.com")
-	openAIAPIKey := getEnv("OPENAI_API_KEY", "")
+	groqAPIKey := getEnv("GROQ_API_KEY", "")
 	environment := getEnv("ENVIRONMENT", "development")
 	rateLimitRPM := getEnvInt("RATE_LIMIT_RPM", 60)
 
@@ -45,7 +45,7 @@ func Load() (*Config, error) {
 		RedisURL:       redisURL,
 		ClerkSecretKey: clerkSecretKey,
 		ClerkIssuerURL: clerkIssuerURL,
-		OpenAIAPIKey:   openAIAPIKey,
+		GroqAPIKey:   groqAPIKey,
 		Environment:    environment,
 		RateLimitRPM:   rateLimitRPM,
 	}, nil
